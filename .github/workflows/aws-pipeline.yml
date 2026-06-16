@@ -1,0 +1,93 @@
+name: AWS Pipeline Demo
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION || 'ap-southeast-1' }}
+  ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY || 'pdf-ocr' }}
+
+permissions:
+  id-token: write   # required for OIDC auth to AWS
+  contents: read
+
+jobs:
+  build-and-test:
+    name: Build & Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build Next.js app
+        run: npm run build
+
+  push-to-ecr:
+    name: Build & Push Docker image to ECR
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.build-image.outputs.image }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag and push image
+        id: build-image
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t $REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -t $REGISTRY/$ECR_REPOSITORY:latest .
+          docker push $REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $REGISTRY/$ECR_REPOSITORY:latest
+          echo "image=$REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> "$GITHUB_OUTPUT"
+
+  # Demo deploy stage — enable once an ECS cluster/service exists.
+  # Requires secrets: ECS_CLUSTER, ECS_SERVICE, ECS_TASK_DEFINITION (path to task-def JSON), CONTAINER_NAME.
+  # deploy-to-ecs:
+  #   name: Deploy to ECS
+  #   needs: push-to-ecr
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - name: Configure AWS credentials
+  #       uses: aws-actions/configure-aws-credentials@v4
+  #       with:
+  #         role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+  #         aws-region: ${{ env.AWS_REGION }}
+  #     - name: Render new task definition
+  #       id: render-task-def
+  #       uses: aws-actions/amazon-ecs-render-task-definition@v1
+  #       with:
+  #         task-definition: ${{ secrets.ECS_TASK_DEFINITION }}
+  #         container-name: ${{ secrets.CONTAINER_NAME }}
+  #         image: ${{ needs.push-to-ecr.outputs.image }}
+  #     - name: Deploy to Amazon ECS
+  #       uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+  #       with:
+  #         task-definition: ${{ steps.render-task-def.outputs.task-definition }}
+  #         cluster: ${{ secrets.ECS_CLUSTER }}
+  #         service: ${{ secrets.ECS_SERVICE }}
+  #         wait-for-service-stability: true

@@ -643,9 +643,15 @@ export function StepTwo({ pipelineData, updatePipelineData, goToNextStep, goToPr
                 <CheckCircle2 className="w-4 h-4 text-primary" />
                 <CardTitle className="text-sm font-semibold">Detected Labels</CardTitle>
               </div>
-              <Badge variant="outline" className="text-xs font-mono bg-primary/5 text-primary border-primary/20">
-                {sortedGroups.length} types / {yoloData.length} total
-              </Badge>
+              <div className="flex items-center gap-2">
+                <Badge variant="outline" className="text-xs font-mono bg-green-50 text-green-600 border-green-200">
+                  <CheckCircle2 className="w-3 h-3 mr-1" />
+                  {sortedGroups.filter(g => isDocumentUploaded(g.label)).length} processed
+                </Badge>
+                <Badge variant="outline" className="text-xs font-mono bg-primary/5 text-primary border-primary/20">
+                  {sortedGroups.length} types / {yoloData.length} total
+                </Badge>
+              </div>
             </div>
             
             {/* Sort buttons */}
@@ -700,20 +706,20 @@ export function StepTwo({ pipelineData, updatePipelineData, goToNextStep, goToPr
                       {/* Left content */}
                       <div className="flex-1 px-3 py-3">
                         {/* Row 1: Label badge + count + crosshair */}
-                        <div className="flex items-center gap-2 flex-wrap">
+                        <div className="flex items-center gap-2.5 flex-wrap">
                           <span 
-                            className="text-[11px] font-bold px-2 py-0.5 rounded-md shadow-sm"
+                            className="text-sm font-bold px-2.5 py-1 rounded-lg shadow-sm"
                             style={{ backgroundColor: color.border, color: 'white' }}
                           >
                             {group.label}
                           </span>
                           <Badge 
                             variant="secondary" 
-                            className="text-[10px] h-5 px-2 font-semibold bg-gray-100 text-gray-600"
+                            className="text-sm h-6 px-2.5 font-bold bg-gray-100 text-gray-700"
                           >
                             x{group.count}
                           </Badge>
-                          {isSelected && <Crosshair className="w-3.5 h-3.5 text-blue-500 animate-pulse" />}
+                          {isSelected && <Crosshair className="w-4 h-4 text-blue-500 animate-pulse" />}
                         </div>
                         
                         {/* Row 2 & 3 - specs (show loading when processing, specs when uploaded) */}
